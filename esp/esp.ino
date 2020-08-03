@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
+#include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <SoftwareSerial.h>
 #include "config.h"
@@ -37,6 +38,14 @@ void handleRoot() {
   if (server.hasArg("location")) {
     String location = server.arg("location");
     location.replace(" ", "+");
+    char locationBuffer[100];
+    location.toCharArray(locationBuffer, 100);
+    int addresses = location.length() + 1;
+    EEPROM.write(0, addresses);
+    for (int i = 1; i < addresses; i++) {
+      EEPROM.write(i, locationBuffer[i-1]);
+    }
+    EEPROM.commit();
     fetchWeather(location);
   }
   server.send(200, "text/html", HTML);
@@ -47,22 +56,24 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
   }
+  
   mSerial.begin(2400);
   Serial.begin(9600);
   Serial.println(WiFi.localIP());
-    http.begin(url);
-    if (http.GET() == 200) {
-      DynamicJsonDocument weather(1200);
-      deserializeJson(weather, http.getString());
-      
-      int temp = weather["main"]["temp"].as<int>() / 10;
-      int humidity = weather["main"]["humidity"].as<int>();
-      auto location = weather["name"].as<const char*>();
 
-      doc["temp"] = temp;
-      doc["humidity"] = humidity;
-      doc["city"] = location;
+  delay(2000);
+  
+  EEPROM.begin(512);
+  int addresses = EEPROM.read(0);
+  if (addresses > 0) {
+    char mLoc[addresses];
+    for (int i = 1; i < addresses; i++) {
+      mLoc[i-1] = EEPROM.read(i);
     }
+    mLoc[addresses-1] = '\0';
+    fetchWeather(String(mLoc));
+  }
+
   server.on("/", handleRoot);
   server.begin();
 }
