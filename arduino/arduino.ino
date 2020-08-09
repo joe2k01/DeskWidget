@@ -2,7 +2,7 @@
 
 #include <GxEPD2_BW.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
-#include <SoftwareSerial.h>
+#include <TimeLib.h>
 
 #include "icons.h"
 
@@ -13,9 +13,8 @@
 #define MAX_HEIGHT(EPD) (EPD::HEIGHT <= MAX_DISPLAY_BUFFER_SIZE / (EPD::WIDTH / 8) ? EPD::HEIGHT : MAX_DISPLAY_BUFFER_SIZE / (EPD::WIDTH / 8))
 
 GxEPD2_BW<GxEPD2_420, MAX_HEIGHT(GxEPD2_420)> display(GxEPD2_420(/*CS*/ 10, /*DC=*/ 9, /*RST=*/ 8, /*BUSY=*/ 7));
-SoftwareSerial mSerial(4, 2);
 
-int textHeight;
+uint16_t textHeight;
 
 void displaySetUp(bool initial) {
   display.init();
@@ -26,9 +25,9 @@ void displaySetUp(bool initial) {
   if (initial) {
     display.setFullWindow();
     char retr[] = "Retrieving Data";
-    int a, b, c;
+    int16_t a, b; uint16_t c;
     display.getTextBounds(retr, 0, 0, &a, &b, &c, &textHeight);
-  
+
     display.firstPage();
     do {
       display.fillScreen(GxEPD_WHITE);
@@ -40,65 +39,143 @@ void displaySetUp(bool initial) {
 
 void setup() {
   Serial.begin(9600);
-  mSerial.begin(2400);
   displaySetUp(true);
 }
 
 void loop() {
   char message[200];
-  
-  while (!mSerial.available()) {
+  int8_t index = 0;
+
+  while (!Serial.available()) {
     // Do nothing
   }
 
-  if (mSerial.available() > 0) {
+  if (Serial.available() > 0) {
     /*
-     * message is a char array of this kind: 1199#City@
-     * 11: are temperature digits
-     * 99: are humidity digits
-     * #: marks the start of the location name
-     * City: is the location name 
-     * @: marks the end of the location name
-     */
-    int index = 0;
-    char c = mSerial.read();
+       message is a char array of this kind: 1199{1596796182}10d#City@
+       11: are temperature digits
+       99: are humidity digits
+       {: marks the start of the unix time
+       1596796182: unix time
+       }: marks the end of the unix time
+       10d: icon identifier
+       #: marks the start of the location name
+       City: is the location name
+       @: marks the end of the location name
+    */
+    char c = Serial.read();
     while (c != '@') { // Read until @ and exclude it
       if (isAscii(c)) { // Make sure valid characters are coming in
         message[index] = c;
         index++;
       }
-      c = mSerial.read();
+      c = Serial.read();
     }
     message[index] = '\0'; // Terminate the string
+    index = 0;
   }
-  Serial.println(message);
-  int temp = (10 * (message[0] - '0')) + (message[1] - '0'); // char[n] - '0' converts char[n] to an integer; multiply by 10 and add char[n+1] - '0' to concatenate 2 digits into one int
-  int humidity;
-  if(message[4] == '#') {
+
+  int8_t temp = (10 * (message[0] - '0')) + (message[1] - '0'); // char[n] - '0' converts char[n] to an integer; multiply by 10 and add char[n+1] - '0' to concatenate 2 digits into one int
+  int8_t humidity, icon;
+  char dateAndTime[80];
+  bool light = false;
+  time_t epoch;
+  if (message[4] == '{') {
     humidity = (10 * (message[2] - '0')) + (message[3] - '0');
+    epoch = (message[5] - '0'); // Extract unix time from message START
+    index = 6;
+    char epochChar[11];
+    while (message[index] != '}') {
+      epoch = (epoch * 10) + (message[index] - '0');
+      index++;
+    } // Extract unix time from message END
   } else {
     humidity = 100;
+    epoch = (message[6] - '0'); // Extract unix time from message START
+    index = 7;
+    char epochChar[11];
+    while (message[index] != '}') {
+      epoch = (epoch * 10) + (message[index] - '0');
+      index++;
+    } // Extract unix time from message END
   }
-  int index = 0;
-  for (int i = 0; i < strlen(message); i++) {
-    if (message[i] == '#') // Define the offset at which the location name starts
-      index = i + 1;
+  
+  index++;
+  icon = (10 * (message[index] - '0')) + (message[index + 1] - '0');
+  if (message[index + 2] == 'd')
+    light = true;
+  
+  char days[7][4] = {
+    "Sun",
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat"
+  };
+  sprintf(dateAndTime, "%s %d/%d/%d %02d:%02d", days[weekday(epoch) - 1], day(epoch), month(epoch), year(epoch), hour(epoch), minute(epoch));
+
+  index = 0;
+  while (message[index] != '#') { // Define the offset at which the location name starts
+    index++;
   }
+  index++;
   char location[50];
-  int j = 0;
+  int8_t j = 0;
   for (index; index < strlen(message); index++) {
     location[j] = message[index];
     j++;
   }
   location[j] = '\0';
+
   display.firstPage();
-    do {
+  do {
+    if (light) {
       display.fillScreen(GxEPD_WHITE);
-      display.setCursor(0, textHeight);
-      display.print(temp);
-      display.setCursor(0, 2 * textHeight);
-      display.print(humidity);
-      display.setCursor(0, 3 * textHeight);
-      display.print(location);
-    } while (display.nextPage());
+      display.setTextColor(GxEPD_BLACK);
+    } else {
+      display.fillScreen(GxEPD_BLACK);
+      display.setTextColor(GxEPD_WHITE);
+    }
+    
+    display.setCursor(0, textHeight);
+    display.print(temp);
+    display.setCursor(0, 2 * textHeight);
+    display.print(humidity);
+    display.setCursor(0, 3 * textHeight);
+    display.print(location);
+    display.setCursor(0, 4 * textHeight);
+    display.print(dateAndTime);
+
+    switch (icon) {
+        case 1:
+          display.drawInvertedBitmap(0, 5 * textHeight, _01, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 2:
+          display.drawInvertedBitmap(0, 5 * textHeight, _02, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 3:
+          display.drawInvertedBitmap(0, 5 * textHeight, _03, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 4:
+          display.drawInvertedBitmap(0, 5 * textHeight, _04, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 9:
+          display.drawInvertedBitmap(0, 5 * textHeight, _09, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 10:
+          display.drawInvertedBitmap(0, 5 * textHeight, _10, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 11:
+          display.drawInvertedBitmap(0, 5 * textHeight, _11, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        /*case 13:
+          display.drawInvertedBitmap(0, 5 * textHeight, _13, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;
+        case 50:
+          display.drawInvertedBitmap(0, 5 * textHeight, _50, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          break;*/
+      }
+  } while (display.nextPage());
 }

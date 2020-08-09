@@ -3,10 +3,8 @@
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
-#include <SoftwareSerial.h>
 #include "config.h"
 
-SoftwareSerial mSerial(0, 2);
 ESP8266WebServer server(80);
 HTTPClient http;
 char url[200];
@@ -21,21 +19,34 @@ void fetchWeather(String location) {
     deserializeJson(weather, http.getString());
 
     int temp = weather["main"]["temp"].as<int>() / 10;
-    int humidity = weather["main"]["humidity"].as<int>();
+    int humidity = weather["main"]["humidity"];
     auto locationName = weather["name"].as<const char*>();
+    long epoch = weather["dt"].as<long>() + weather["timezone"].as<long>();
+
+    char icon[4];
+    JsonArray weatherArray = weather["weather"].as<JsonArray>();
+    for (JsonVariant v : weatherArray) {
+      JsonObject o = v.as<JsonObject>();
+      auto tmpIcon = o["icon"].as<const char*>();
+      strcpy(icon, tmpIcon);
+      icon[3] = '\0';
+    }
 
     int messageSize = location.length() + 6;
     char message[messageSize];
     /*
-     * message is a char array of this kind: 1199#City@
+     * message is a char array of this kind: 1199{1596796182}10d#City@
      * 11: are temperature digits
      * 99: are humidity digits
+     * {: marks the start of the unix time
+     * 1596796182: unix time
+     * }: marks the end of the unix time
+     * 10d: icon identifier
      * #: marks the start of the location name
      * City: is the location name 
      * @: marks the end of the location name
      */
-    sprintf(message, "%d%d#%s@", temp, humidity, locationName);
-    mSerial.write(message);
+    sprintf(message, "%d%d{%ld}%s#%s@", temp, humidity, epoch, icon, locationName);
     Serial.write(message);
   }
   http.end();
@@ -64,9 +75,8 @@ void setup() {
     delay(500);
   }
 
-  mSerial.begin(2400);
   Serial.begin(9600);
-  Serial.println(WiFi.localIP());
+  // Serial.println(WiFi.localIP());
 
   delay(2000);
 
