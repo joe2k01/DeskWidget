@@ -150,32 +150,32 @@ void loop() {
 
     switch (icon) {
         case 1:
-          display.drawInvertedBitmap(0, 5 * textHeight, _01, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, light ? _01d : _01n, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 2:
-          display.drawInvertedBitmap(0, 5 * textHeight, _02, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 3:
-          display.drawInvertedBitmap(0, 5 * textHeight, _03, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 4:
-          display.drawInvertedBitmap(0, 5 * textHeight, _04, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 9:
-          display.drawInvertedBitmap(0, 5 * textHeight, _09, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 10:
-          display.drawInvertedBitmap(0, 5 * textHeight, _10, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(0, 5 * textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 11:
           display.drawInvertedBitmap(0, 5 * textHeight, _11, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
-        /*case 13:
+        case 13:
           display.drawInvertedBitmap(0, 5 * textHeight, _13, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 50:
           display.drawInvertedBitmap(0, 5 * textHeight, _50, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
-          break;*/
+          break;
       }
   } while (display.nextPage());
 }
