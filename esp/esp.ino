@@ -5,13 +5,21 @@
 #include <ArduinoJson.h>
 #include "config.h"
 
+#define MINUTE 60 * 1000L
+
 ESP8266WebServer server(80);
 HTTPClient http;
 char url[200];
+char mLoc[100];
+unsigned long elapsed = 0;
 
 void fetchWeather(String location) {
   char locationChar[100];
   location.toCharArray(locationChar, 100);
+
+  memset(mLoc, '\0', 100);
+  strcpy(mLoc, locationChar);
+
   sprintf(url, "http://api.openweathermap.org/data/2.5/weather?q=%s&APPID=%s", locationChar, APPID);
   http.begin(url);
   if (http.GET() == 200) {
@@ -83,7 +91,6 @@ void setup() {
   EEPROM.begin(512);
   int addresses = EEPROM.read(0);
   if (addresses > 0) {
-    char mLoc[addresses];
     for (int i = 1; i < addresses; i++) {
       mLoc[i - 1] = EEPROM.read(i);
     }
@@ -97,4 +104,12 @@ void setup() {
 
 void loop() {
   server.handleClient();
+
+  if ((millis() - elapsed) >= MINUTE) {
+    elapsed += MINUTE;
+    fetchWeather(mLoc);
+  } else if (millis() < elapsed) {
+    elapsed = 0L;
+    fetchWeather(mLoc);
+  }
 }
