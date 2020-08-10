@@ -5,6 +5,7 @@
 #include <TimeLib.h>
 
 #include "icons.h"
+#include "degree.h"
 
 #define W 100 // Icon Width
 #define H 100 // Icon Height
@@ -27,6 +28,7 @@ void displaySetUp(bool initial) {
     char retr[] = "Retrieving Data";
     int16_t a, b; uint16_t c;
     display.getTextBounds(retr, 0, 0, &a, &b, &c, &textHeight);
+    textHeight += 7;
 
     display.firstPage();
     do {
@@ -65,7 +67,7 @@ void loop() {
     */
     char c = Serial.read();
     while (c != '@') { // Read until @ and exclude it
-      if (isAscii(c)) { // Make sure valid characters are coming in
+      if (isAscii(c) && c != '\n') { // Make sure valid characters are coming in. Ignore \n to allow IDE's serial monitor usage
         message[index] = c;
         index++;
       }
@@ -129,53 +131,74 @@ void loop() {
   }
   location[j] = '\0';
 
+  char tempInfo[18]; char humidityInfo[15];
+  sprintf(tempInfo, "Temperature: %d", temp);
+  sprintf(humidityInfo, "Humidity: %d%c", humidity, '%');
+  int16_t a, b; uint16_t tempInfoWidth, c;
+  display.getTextBounds(tempInfo, 0, 0, &a, &b, &tempInfoWidth, &c);
   display.firstPage();
   do {
     if (light) {
       display.fillScreen(GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
+      display.fillRect(0, 0, 400, 6, GxEPD_BLACK);
+      display.fillRect(0, 0, 6, 300, GxEPD_BLACK);
+      display.fillRect(0, 294, 400, 6, GxEPD_BLACK);
+      display.fillRect(394, 0, 6, 300, GxEPD_BLACK);
     } else {
       display.fillScreen(GxEPD_BLACK);
       display.setTextColor(GxEPD_WHITE);
+      display.fillRect(0, 0, 400, 6, GxEPD_WHITE);
+      display.fillRect(0, 0, 6, 300, GxEPD_WHITE);
+      display.fillRect(0, 294, 400, 6, GxEPD_WHITE);
+      display.fillRect(394, 0, 6, 300, GxEPD_WHITE);
     }
-    
-    display.setCursor(0, textHeight);
-    display.print(temp);
-    display.setCursor(0, 2 * textHeight);
-    display.print(humidity);
-    display.setCursor(0, 3 * textHeight);
-    display.print(location);
-    display.setCursor(0, 4 * textHeight);
-    display.print(dateAndTime);
 
     switch (icon) {
         case 1:
-          display.drawInvertedBitmap(0, 5 * textHeight, light ? _01d : _01n, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, light ? _01d : _01n, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 2:
-          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 3:
-          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 4:
-          display.drawInvertedBitmap(0, 5 * textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, clouds, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 9:
-          display.drawInvertedBitmap(0, 5 * textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 10:
-          display.drawInvertedBitmap(0, 5 * textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, rain, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 11:
-          display.drawInvertedBitmap(0, 5 * textHeight, _11, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, _11, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 13:
-          display.drawInvertedBitmap(0, 5 * textHeight, _13, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, _13, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
         case 50:
-          display.drawInvertedBitmap(0, 5 * textHeight, _50, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
+          display.drawInvertedBitmap(7, textHeight, _50, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
       }
+
+    display.setCursor(107, textHeight + 50);
+    display.print(tempInfo);
+
+    display.setFont(&Degree);
+    display.setCursor(107 + tempInfoWidth, textHeight + 50);
+    display.print(char(0));
+
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(107 + tempInfoWidth + 17, textHeight + 50);
+    display.print('C');
+    display.setCursor(107, (2 * textHeight) + 50);
+    display.print(humidityInfo);
+    display.setCursor(7, (3 * textHeight) + 100);
+    display.print(location);
+    display.setCursor(7, (4 * textHeight) + 100);
+    display.print(dateAndTime);
   } while (display.nextPage());
 }
