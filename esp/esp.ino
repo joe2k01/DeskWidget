@@ -3,12 +3,17 @@
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
 #include "config.h"
 
 #define MINUTE 60 * 1000L
 
 ESP8266WebServer server(80);
 HTTPClient http;
+WiFiUDP ntpUDP;
+
 char url[200];
 char mLoc[100];
 unsigned long elapsed = 0;
@@ -29,7 +34,14 @@ void fetchWeather(String location) {
     int temp = weather["main"]["temp"].as<int>() / 10;
     int humidity = weather["main"]["humidity"];
     auto locationName = weather["name"].as<const char*>();
-    long epoch = weather["dt"].as<long>() + weather["timezone"].as<long>();
+
+    NTPClient timeClient(ntpUDP, weather["timezone"].as<long>());
+    timeClient.begin();
+    timeClient.update();
+
+    long epoch = timeClient.getEpochTime();
+
+    timeClient.end();
 
     char icon[4];
     JsonArray weatherArray = weather["weather"].as<JsonArray>();
