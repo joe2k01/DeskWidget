@@ -17,6 +17,7 @@ WiFiUDP ntpUDP;
 char url[200];
 char mLoc[100];
 unsigned long elapsed = 0;
+int addrOffset = 0;
 
 void fetchWeather(String location) {
   char locationChar[100];
@@ -55,17 +56,17 @@ void fetchWeather(String location) {
     int messageSize = location.length() + 6;
     char message[messageSize];
     /*
-     * message is a char array of this kind: 1199{1596796182}10d#City@
-     * 11: are temperature digits
-     * 99: are humidity digits
-     * {: marks the start of the unix time
-     * 1596796182: unix time
-     * }: marks the end of the unix time
-     * 10d: icon identifier
-     * #: marks the start of the location name
-     * City: is the location name 
-     * @: marks the end of the location name
-     */
+       message is a char array of this kind: 1199{1596796182}10d#City@
+       11: are temperature digits
+       99: are humidity digits
+       {: marks the start of the unix time
+       1596796182: unix time
+       }: marks the end of the unix time
+       10d: icon identifier
+       #: marks the start of the location name
+       City: is the location name
+       @: marks the end of the location name
+    */
     sprintf(message, "%d%d{%ld}%s#%s@", temp, humidity, epoch, icon, locationName);
     Serial.write(message);
   }
@@ -78,10 +79,12 @@ void handleRoot() {
     location.replace(" ", "+");
     char locationBuffer[100];
     location.toCharArray(locationBuffer, 100);
-    int addresses = location.length() + 1;
-    EEPROM.write(0, addresses);
-    for (int i = 1; i < addresses; i++) {
-      EEPROM.write(i, locationBuffer[i - 1]);
+    int addresses = location.length();
+    EEPROM.write(addrOffset, addresses);
+    int j = addrOffset;
+    for (int i = 0; i < addresses; i++) {
+      j++;
+      EEPROM.write(j, locationBuffer[i]);
     }
     EEPROM.commit();
     fetchWeather(location);
@@ -89,39 +92,93 @@ void handleRoot() {
   server.send(200, "text/html", HTML);
 }
 
-void setup() {
-  WiFi.begin(APNAME, PWD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-  }
+void handleConfigurationRoot() {
+  if (server.hasArg("ssid") && server.hasArg("pwd")) {
+    String ssid = server.arg("ssid");
+    char ssidBuffer[100];
+    ssid.toCharArray(ssidBuffer, 100);
+    int ssidAddresses = ssid.length();
 
-  Serial.begin(9600);
-  // Serial.println(WiFi.localIP());
+    String pwd = server.arg("pwd");
+    char pwdBuffer[100];
+    pwd.toCharArray(pwdBuffer, 100);
+    int pwdAddresses = pwd.length();
 
-  delay(2000);
-
-  EEPROM.begin(512);
-  int addresses = EEPROM.read(0);
-  if (addresses > 0) {
-    for (int i = 1; i < addresses; i++) {
-      mLoc[i - 1] = EEPROM.read(i);
+    EEPROM.write(0, ssidAddresses);
+    for (int i = 0; i < ssidAddresses; i++) {
+      EEPROM.write(i + 1, ssidBuffer[i]);
     }
-    mLoc[addresses - 1] = '\0';
-    fetchWeather(String(mLoc));
+    int j = ssidAddresses + 1;
+    EEPROM.write(j, pwdAddresses);
+    for (int k = 0; k < pwdAddresses; k++) {
+      j++;
+      EEPROM.write(j, pwdBuffer[k]);
+    }
+    EEPROM.commit();
   }
+  server.send(200, "text/html", CHTML);
+}
 
-  server.on("/", handleRoot);
-  server.begin();
+int readEEPROM(int a, char buff[]) {
+  int addresses = EEPROM.read(a);
+  if (addresses > 0 && addresses <= 100) {
+    a++;
+    for (int i = 0; i < addresses; i++) {
+      buff[i] = EEPROM.read(a + i);
+    }
+    buff[addresses] = '\0';
+    return addresses;
+  }
+  return -1;
+}
+
+void setup() {
+  EEPROM.begin(512);
+  Serial.begin(9600);
+
+  char ssid[100];
+  int a = readEEPROM(0, ssid);
+
+  char pwd[100];
+  int p = readEEPROM(a + 1, pwd);
+  if (a > 0 && p > 0) {
+    addrOffset = p + a + 2;
+    WiFi.begin(ssid, pwd);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+    }
+
+    delay(2000);
+
+    readEEPROM(addrOffset, mLoc);
+    fetchWeather(String(mLoc));
+
+    server.on("/", handleRoot);
+    server.begin();
+  } else {
+    char softSSID[21] = "DeskWidgetSetUp-";
+    char randomN[5];
+
+    sprintf(randomN, "%d", random(1000, 9999));
+    strcat(softSSID, randomN);
+
+    WiFi.softAP(softSSID, PWD, 1, false, 1);
+
+    server.on("/", handleConfigurationRoot);
+    server.begin();
+  }
 }
 
 void loop() {
   server.handleClient();
 
-  if ((millis() - elapsed) >= MINUTE) {
-    elapsed += MINUTE;
-    fetchWeather(mLoc);
-  } else if (millis() < elapsed) {
-    elapsed = 0L;
-    fetchWeather(mLoc);
+  if (addrOffset > 0) {
+    if ((millis() - elapsed) >= MINUTE) {
+      elapsed += MINUTE;
+      fetchWeather(mLoc);
+    } else if (millis() < elapsed) {
+      elapsed = 0L;
+      fetchWeather(mLoc);
+    }
   }
 }
