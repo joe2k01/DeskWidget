@@ -115,6 +115,9 @@ void handleConfigurationRoot() {
       EEPROM.write(j, pwdBuffer[k]);
     }
     EEPROM.commit();
+    server.send(200, "text/plain", "Your DeskWidget will now connect to the network");
+    delay(200);
+    ESP.restart();
   }
   server.send(200, "text/html", CHTML);
 }
@@ -133,16 +136,17 @@ int readEEPROM(int a, char buff[]) {
 }
 
 void setup() {
+  WiFi.softAPdisconnect(true); // Turn off soft AP mode in case configuration wa run before
   EEPROM.begin(512);
   Serial.begin(9600);
 
   char ssid[100];
-  int a = readEEPROM(0, ssid);
+  int a = readEEPROM(0, ssid); // Read the AccessPoint's name saved in EEPROM
 
-  char pwd[100];
+  char pwd[100]; // Read the AccessPoint's password saved in EEPROM
   int p = readEEPROM(a + 1, pwd);
   if (a > 0 && p > 0) {
-    addrOffset = p + a + 2;
+    addrOffset = p + a + 2; // Set an offset not to overwrite AccessPoint credentials in EEPROM
     WiFi.begin(ssid, pwd);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
@@ -162,7 +166,7 @@ void setup() {
     sprintf(randomN, "%d", random(1000, 9999));
     strcat(softSSID, randomN);
 
-    WiFi.softAP(softSSID, PWD, 1, false, 1);
+    WiFi.softAP(softSSID, PWD, 1, false, 1); // Create a network to which the user will connect to configure the DeskWidget
 
     server.on("/", handleConfigurationRoot);
     server.begin();
