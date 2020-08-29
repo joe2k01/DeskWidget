@@ -135,6 +135,19 @@ int readEEPROM(int a, char buff[]) {
   return -1;
 }
 
+void configurationSetUp() {
+  char softSSID[21] = "DeskWidgetSetUp-";
+  char randomN[5];
+
+  sprintf(randomN, "%d", random(1000, 9999));
+  strcat(softSSID, randomN);
+
+  WiFi.softAP(softSSID, PWD, 1, false, 1); // Create a network to which the user will connect to configure the DeskWidget
+
+  server.on("/", handleConfigurationRoot);
+  server.begin();
+}
+
 void setup() {
   WiFi.softAPdisconnect(true); // Turn off soft AP mode in case configuration wa run before
   EEPROM.begin(512);
@@ -147,29 +160,37 @@ void setup() {
   int p = readEEPROM(a + 1, pwd);
   if (a > 0 && p > 0) {
     addrOffset = p + a + 2; // Set an offset not to overwrite AccessPoint credentials in EEPROM
-    WiFi.begin(ssid, pwd);
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
+
+    int n = WiFi.scanNetworks();
+    boolean networkAvailable = false;
+    for (int i = 0; i < n; i++) {
+      char buff[100];
+      String mSSID = WiFi.SSID(i);
+      mSSID.toCharArray(buff, 100);
+      networkAvailable = (strcmp(buff, ssid) == 0);
+      Serial.println(networkAvailable);
+      if (networkAvailable)
+        break;
     }
 
-    delay(2000);
+    if (networkAvailable) {
+      WiFi.begin(ssid, pwd);
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+      }
 
-    readEEPROM(addrOffset, mLoc);
-    fetchWeather(String(mLoc));
+      delay(2000);
 
-    server.on("/", handleRoot);
-    server.begin();
+      readEEPROM(addrOffset, mLoc);
+      fetchWeather(String(mLoc));
+
+      server.on("/", handleRoot);
+      server.begin();
+    } else {
+      configurationSetUp();
+    }
   } else {
-    char softSSID[21] = "DeskWidgetSetUp-";
-    char randomN[5];
-
-    sprintf(randomN, "%d", random(1000, 9999));
-    strcat(softSSID, randomN);
-
-    WiFi.softAP(softSSID, PWD, 1, false, 1); // Create a network to which the user will connect to configure the DeskWidget
-
-    server.on("/", handleConfigurationRoot);
-    server.begin();
+    configurationSetUp();
   }
 }
 
