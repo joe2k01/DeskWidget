@@ -77,84 +77,91 @@ void loop() {
     index = 0;
   }
 
-  int8_t temp = (10 * (message[0] - '0')) + (message[1] - '0'); // char[n] - '0' converts char[n] to an integer; multiply by 10 and add char[n+1] - '0' to concatenate 2 digits into one int
-  int8_t humidity, icon;
-  char dateAndTime[80];
-  bool light = false;
-  time_t epoch;
-  if (message[4] == '{') {
-    humidity = (10 * (message[2] - '0')) + (message[3] - '0');
-    epoch = (message[5] - '0'); // Extract unix time from message START
-    index = 6;
-    char epochChar[11];
-    while (message[index] != '}') {
-      epoch = (epoch * 10) + (message[index] - '0');
-      index++;
-    } // Extract unix time from message END
-  } else {
-    humidity = 100;
-    epoch = (message[6] - '0'); // Extract unix time from message START
-    index = 7;
-    char epochChar[11];
-    while (message[index] != '}') {
-      epoch = (epoch * 10) + (message[index] - '0');
-      index++;
-    } // Extract unix time from message END
-  }
-  
-  index++;
-  icon = (10 * (message[index] - '0')) + (message[index + 1] - '0');
-  if (message[index + 2] == 'd')
-    light = true;
-  
-  char days[7][4] = {
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat"
-  };
-  sprintf(dateAndTime, "%s %d/%d/%d %02d:%02d", days[weekday(epoch) - 1], day(epoch), month(epoch), year(epoch), hour(epoch), minute(epoch));
-
-  index = 0;
-  while (message[index] != '#') { // Define the offset at which the location name starts
-    index++;
-  }
-  index++;
-  char location[50];
-  int8_t j = 0;
-  for (index; index < strlen(message); index++) {
-    location[j] = message[index];
-    j++;
-  }
-  location[j] = '\0';
-
-  char tempInfo[18]; char humidityInfo[15];
-  sprintf(tempInfo, "Temperature: %d", temp);
-  sprintf(humidityInfo, "Humidity: %d%c", humidity, '%');
-  int16_t a, b; uint16_t tempInfoWidth, c;
-  display.getTextBounds(tempInfo, 0, 0, &a, &b, &tempInfoWidth, &c);
-  display.firstPage();
-  do {
-    if (light) {
-      display.fillScreen(GxEPD_WHITE);
-      display.setTextColor(GxEPD_BLACK);
-      display.fillRect(0, 0, 400, 6, GxEPD_BLACK);
-      display.fillRect(0, 0, 6, 300, GxEPD_BLACK);
-      display.fillRect(0, 294, 400, 6, GxEPD_BLACK);
-      display.fillRect(394, 0, 6, 300, GxEPD_BLACK);
+  if (message[0] == 'D' || message[0] == '1') {
+    display.firstPage();
+    do {
+      display.setCursor(0, textHeight);
+      display.print(message);
+    } while (display.nextPage());
+  } else if (strchr(message, '{') != NULL) { // Only proceed for valid messages
+    int8_t temp = (10 * (message[0] - '0')) + (message[1] - '0'); // char[n] - '0' converts char[n] to an integer; multiply by 10 and add char[n+1] - '0' to concatenate 2 digits into one int
+    int8_t humidity, icon;
+    char dateAndTime[80];
+    bool light = false;
+    time_t epoch;
+    if (message[4] == '{') {
+      humidity = (10 * (message[2] - '0')) + (message[3] - '0');
+      epoch = (message[5] - '0'); // Extract unix time from message START
+      index = 6;
+      char epochChar[11];
+      while (message[index] != '}') {
+        epoch = (epoch * 10) + (message[index] - '0');
+        index++;
+      } // Extract unix time from message END
     } else {
-      display.fillScreen(GxEPD_BLACK);
-      display.setTextColor(GxEPD_WHITE);
-      display.fillRect(0, 0, 400, 6, GxEPD_WHITE);
-      display.fillRect(0, 0, 6, 300, GxEPD_WHITE);
-      display.fillRect(0, 294, 400, 6, GxEPD_WHITE);
-      display.fillRect(394, 0, 6, 300, GxEPD_WHITE);
+      humidity = 100;
+      epoch = (message[6] - '0'); // Extract unix time from message START
+      index = 7;
+      char epochChar[11];
+      while (message[index] != '}') {
+        epoch = (epoch * 10) + (message[index] - '0');
+        index++;
+      } // Extract unix time from message END
     }
 
-    switch (icon) {
+    index++;
+    icon = (10 * (message[index] - '0')) + (message[index + 1] - '0');
+    if (message[index + 2] == 'd')
+      light = true;
+
+    char days[7][4] = {
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    };
+    sprintf(dateAndTime, "%s %d/%d/%d %02d:%02d", days[weekday(epoch) - 1], day(epoch), month(epoch), year(epoch), hour(epoch), minute(epoch));
+
+    index = 0;
+    while (message[index] != '#') { // Define the offset at which the location name starts
+      index++;
+    }
+    index++;
+    char location[50];
+    int8_t j = 0;
+    for (index; index < strlen(message); index++) {
+      location[j] = message[index];
+      j++;
+    }
+    location[j] = '\0';
+
+    char tempInfo[18]; char humidityInfo[15];
+    sprintf(tempInfo, "Temperature: %d", temp);
+    sprintf(humidityInfo, "Humidity: %d%c", humidity, '%');
+    int16_t a, b; uint16_t tempInfoWidth, c;
+    display.getTextBounds(tempInfo, 0, 0, &a, &b, &tempInfoWidth, &c);
+    display.firstPage();
+    do {
+      if (light) {
+        display.fillScreen(GxEPD_WHITE);
+        display.setTextColor(GxEPD_BLACK);
+        display.fillRect(0, 0, 400, 6, GxEPD_BLACK);
+        display.fillRect(0, 0, 6, 300, GxEPD_BLACK);
+        display.fillRect(0, 294, 400, 6, GxEPD_BLACK);
+        display.fillRect(394, 0, 6, 300, GxEPD_BLACK);
+      } else {
+        display.fillScreen(GxEPD_BLACK);
+        display.setTextColor(GxEPD_WHITE);
+        display.fillRect(0, 0, 400, 6, GxEPD_WHITE);
+        display.fillRect(0, 0, 6, 300, GxEPD_WHITE);
+        display.fillRect(0, 294, 400, 6, GxEPD_WHITE);
+        display.fillRect(394, 0, 6, 300, GxEPD_WHITE);
+      }
+
+      switch (icon) {
         case 1:
           display.drawInvertedBitmap(7, textHeight, light ? _01d : _01n, W, H, light ? GxEPD_BLACK : GxEPD_WHITE);
           break;
@@ -184,21 +191,22 @@ void loop() {
           break;
       }
 
-    display.setCursor(107, textHeight + 50);
-    display.print(tempInfo);
+      display.setCursor(107, textHeight + 50);
+      display.print(tempInfo);
 
-    display.setFont(&Degree);
-    display.setCursor(107 + tempInfoWidth, textHeight + 50);
-    display.print(char(0));
+      display.setFont(&Degree);
+      display.setCursor(107 + tempInfoWidth, textHeight + 50);
+      display.print(char(0));
 
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(107 + tempInfoWidth + 17, textHeight + 50);
-    display.print('C');
-    display.setCursor(107, (2 * textHeight) + 50);
-    display.print(humidityInfo);
-    display.setCursor(7, (3 * textHeight) + 100);
-    display.print(location);
-    display.setCursor(7, (4 * textHeight) + 100);
-    display.print(dateAndTime);
-  } while (display.nextPage());
+      display.setFont(&FreeMonoBold12pt7b);
+      display.setCursor(107 + tempInfoWidth + 17, textHeight + 50);
+      display.print('C');
+      display.setCursor(107, (2 * textHeight) + 50);
+      display.print(humidityInfo);
+      display.setCursor(7, (3 * textHeight) + 100);
+      display.print(location);
+      display.setCursor(7, (4 * textHeight) + 100);
+      display.print(dateAndTime);
+    } while (display.nextPage());
+  }
 }
