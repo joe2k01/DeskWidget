@@ -15,9 +15,11 @@ HTTPClient http;
 WiFiUDP ntpUDP;
 
 char url[200];
-char mLoc[100];
+char mLoc[100] = "";
 unsigned long elapsed = 0;
 int addrOffset = 0;
+
+void configurationSetUp();
 
 void fetchWeather(String location) {
   char locationChar[100];
@@ -94,6 +96,12 @@ void handleRoot() {
 
 void handleConfigurationRoot() {
   if (server.hasArg("ssid") && server.hasArg("pwd")) {
+    for (int i = 0; i < 513; i++) { // Wipe the EEPROM
+      EEPROM.write(i, -1);
+    }
+    EEPROM.commit();
+    memset(mLoc, '\0', 100); // Clear the location variable
+
     String ssid = server.arg("ssid");
     char ssidBuffer[100];
     ssid.toCharArray(ssidBuffer, 100);
@@ -116,8 +124,37 @@ void handleConfigurationRoot() {
     }
     EEPROM.commit();
     server.send(200, "text/plain", "Your DeskWidget will now connect to the network");
+    addrOffset = j + 1;
     delay(200);
-    ESP.restart();
+
+    WiFi.softAPdisconnect(true);
+    WiFi.disconnect(true);
+
+    int n = WiFi.scanNetworks();
+    boolean networkAvailable = false;
+    for (int i = 0; i < n; i++) {
+      if (WiFi.SSID(i) == ssid)
+        networkAvailable = true;
+      if (networkAvailable)
+        break;
+    }
+
+    if (networkAvailable) {
+      WiFi.begin(ssid, pwd);
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+      }
+
+      server.on("/", handleRoot);
+      server.begin();
+
+      char ip[16];
+      WiFi.localIP().toString().toCharArray(ip, 16);
+      strcat(ip, "@");
+      Serial.write(ip);
+    } else {
+      configurationSetUp();
+    }
   }
   server.send(200, "text/html", CHTML);
 }
@@ -136,7 +173,7 @@ int readEEPROM(int a, char buff[]) {
 }
 
 void configurationSetUp() {
-  char softSSID[21] = "DeskWidgetSetUp-";
+  char softSSID[22] = "DeskWidgetSetUp-";
   char randomN[5];
 
   sprintf(randomN, "%d", random(1000, 9999));
@@ -144,8 +181,11 @@ void configurationSetUp() {
 
   WiFi.softAP(softSSID, PWD, 1, false, 1); // Create a network to which the user will connect to configure the DeskWidget
 
-  server.on("/", handleConfigurationRoot);
+  server.on("/c", handleConfigurationRoot);
   server.begin();
+
+  strcat(softSSID, "@");
+  Serial.write(softSSID);
 }
 
 void setup() {
@@ -168,7 +208,6 @@ void setup() {
       String mSSID = WiFi.SSID(i);
       mSSID.toCharArray(buff, 100);
       networkAvailable = (strcmp(buff, ssid) == 0);
-      Serial.println(networkAvailable);
       if (networkAvailable)
         break;
     }
@@ -181,11 +220,19 @@ void setup() {
 
       delay(2000);
 
-      readEEPROM(addrOffset, mLoc);
-      fetchWeather(String(mLoc));
-
       server.on("/", handleRoot);
+      server.on("/c", handleConfigurationRoot);
       server.begin();
+
+      int f = readEEPROM(addrOffset, mLoc);
+      if (f > 0)
+        fetchWeather(String(mLoc));
+      else {
+        char ip[16];
+        WiFi.localIP().toString().toCharArray(ip, 16);
+        strcat(ip, "@");
+        Serial.write(ip);
+      }
     } else {
       configurationSetUp();
     }
@@ -197,7 +244,7 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  if (addrOffset > 0) {
+  if (addrOffset > 0 && mLoc[0] != '\0') {
     if ((millis() - elapsed) >= MINUTE) {
       elapsed += MINUTE;
       fetchWeather(mLoc);
