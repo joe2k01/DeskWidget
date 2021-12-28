@@ -77,7 +77,8 @@ void loop() {
     index = 0;
   }
 
-  if (message[0] == 'D' || message[0] == '1') {
+  // Check that message is not a debug message.
+  if (message[0] == 'D' || message[0] == '1' && strchr(message, '{') == NULL) {
     display.firstPage();
     do {
       display.setCursor(0, textHeight);
