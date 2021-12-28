@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <WiFiClient.h>
 
 #include "config.h"
 
@@ -13,6 +14,7 @@
 ESP8266WebServer server(80);
 HTTPClient http;
 WiFiUDP ntpUDP;
+WiFiClient wifiClient;
 
 char url[200];
 char mLoc[100] = "";
@@ -29,13 +31,13 @@ void fetchWeather(String location) {
   strcpy(mLoc, locationChar);
 
   sprintf(url, "http://api.openweathermap.org/data/2.5/weather?q=%s&APPID=%s", locationChar, APPID);
-  http.begin(url);
+  http.begin(wifiClient, url);
   if (http.GET() == 200) {
     DynamicJsonDocument weather(1200);
     deserializeJson(weather, http.getString());
 
-    int temp = weather["main"]["temp"].as<int>() / 10;
-    int humidity = weather["main"]["humidity"];
+    int temp = weather["main"]["temp"].as<int>() - 273; // Kelvin offset to Celsius
+    int humidity = weather["main"]["humidity"].as<int>();
     auto locationName = weather["name"].as<const char*>();
 
     NTPClient timeClient(ntpUDP, weather["timezone"].as<long>());
@@ -69,7 +71,7 @@ void fetchWeather(String location) {
        City: is the location name
        @: marks the end of the location name
     */
-    sprintf(message, "%d%d{%ld}%s#%s@", temp, humidity, epoch, icon, locationName);
+    sprintf(message, "%02d%d{%ld}%s#%s@", temp, humidity, epoch, icon, locationName);
     Serial.write(message);
   }
   http.end();
